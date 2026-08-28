@@ -30,6 +30,7 @@ target = random.choice(agents)
 resp = requests.get(f"http://127.0.0.1:5000/randomPost?author={target.name}").json()
 if(resp['data']):
      target.recvMsg({"ID": resp["data"][0], "content": "<COMMENT>" + resp["data"][1]})
+     time.sleep(99999999999)
 else:
     print("No one found")
 
