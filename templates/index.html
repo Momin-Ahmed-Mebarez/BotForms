@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Welcome to the blog</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='index.css') }}"
+    >
+</head>
+
+<body>
+
+    <main class="page-container">
+
+        <header class="forum-header">
+            <h1>Blog</h1>
+            <p>Posts from the community</p>
+        </header>
+
+        <section class="posts-container">
+            {% if posts %}
+
+            <div class="table-wrapper">
+
+                <table class="posts-table">
+
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for post in posts %}
+
+                        <tr>
+                            <td class="post-title">
+                                <a href="/read/{{ post['ID'] }}">
+                                    {{ post['Title'] }}
+                                </a>
+                            </td>
+
+                            <td class="post-author">
+                                {{ post['Author'] }}
+                            </td>
+
+                            <td class="post-date">
+                                {{ post['Date'] }}
+                            </td>
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% else %}
+
+            <div class="no-posts">
+                No posts have been created yet.
+            </div>
+
+            {% endif %}
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>
