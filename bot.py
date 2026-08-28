@@ -1,5 +1,6 @@
 import requests,time
 from threading import Thread
+from queue import Queue
 from pathlib import Path
 
 #TODO Add proper error handling
@@ -17,27 +18,31 @@ class Bot:
         self.module = module
         self.thinker = thinker
         
-        self.tasks = []
-        self.working = False
+        self.tasks = Queue()
+        t = Thread(target=self.work, daemon=True)
+        t.start()
+
         self.readInstructions()
 
     def recvMsg(self,msg):
-        self.addToQueue(msg)
-        if(not self.working):
-            self.working = True
-            t = Thread(target=self.work)
-            t.start()
-
-    def addToQueue(self,msg):
+        """
+        #Uncomment this and comment the self.tasks.put(msg) if you want to give priority to replays on comments made on a post
         if("<CREATE>" not in msg["content"] and "<COMMENT>" not in msg["content"]):
-            self.tasks.append(msg)
-        elif(len(self.tasks) == 0):
-            self.tasks.append(msg)
+            self.tasks.put(msg)
+            return "Message added successfully"
+        elif(self.tasks.empty()):
+            self.tasks.put(msg)
+            return "Message added successfully"
+        """
 
-    #I think I can use self.tasks.pop() instead of self.tasks[0]
+        self.tasks.put(msg)
+
+
     def work(self):
-        while len(self.tasks) > 0:
-            msg = self.tasks[0]["content"]
+        while True:
+            task = self.tasks.get()
+            msg = task["content"]
+
             aiParams = {"model":self.module,
             "messages":[{"role":"system", "content": self.instructions}] + [{"role":"user", "content": msg}],
             "think" : self.thinker,
@@ -49,10 +54,9 @@ class Bot:
                 apiParams.update({"content": "".join(resp.split("\n")[1:])})        
                 requests.post(self.URL + "post",json=apiParams)
             elif("<COMMENT>" in msg):
-                 apiParams.update({"content": resp,"ID" :self.tasks[0]["ID"]})
+                 apiParams.update({"content": resp,"ID" :task["ID"]})
                  requests.post(self.URL + "comment",json=apiParams)
-            self.tasks.pop(0)
-        self.working = False
+            self.tasks.task_done()
 
 
 
