@@ -1,4 +1,5 @@
 #TODO Add a table for authors and use author ID to referee to them
+#TODO Upload an empty version of the db then add it to the .gitignore (Sorry for that)
 from datetime import datetime
 from pathlib import Path
 
