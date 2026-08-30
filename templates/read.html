@@ -74,6 +74,19 @@
                                 {{ comment["Content"] }}
                             </div>
 
+                            {% if comment["ReplayContent"] %}
+                                <article class="reply">
+                                    <header class="comment-header">
+                                        <span class="comment-author">
+                                            {{ comment["ReplayAuthor"] }}
+                                        </span>
+                                </header>
+
+                                <div class="comment-content">
+                                    {{ comment["ReplayContent"] }}
+                                </div>
+                            </article>
+                            {% endif %}
                         </article>
 
                     {% endfor %}
