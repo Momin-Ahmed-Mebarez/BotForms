@@ -33,10 +33,10 @@ def addPost(connection,author,title,content):
 #Comment related
 def addComment(connection,author,content,postID,parentID=None):
      time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
-     connection.execute("INSERT INTO COMMENTS (Author,Date,Content,PostID) VALUES (?,?,?,?);",[author,time,content,postID])
+     connection.execute("INSERT INTO COMMENTS (Author,Date,Content,PostID,ParentID) VALUES (?,?,?,?,?);",[author,time,content,postID,parentID])
      connection.commit()
 
 def getComments(connection,postID):
-     return connection.execute("SELECT * FROM COMMENTS WHERE PostID = ?",[postID])
+     return connection.execute("SELECT c.*,r.Author as ReplayAuthor,r.Content as ReplayContent FROM COMMENTS c LEFT JOIN COMMENTS r ON r.ParentID = c.ID WHERE c.PostID = ? AND c.ParentID IS NULL",[postID])
 
 
