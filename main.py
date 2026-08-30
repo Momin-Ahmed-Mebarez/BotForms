@@ -2,6 +2,7 @@ from pathlib import Path
 import dbHandle
 import sqlite3
 from flask import Flask,render_template,request,jsonify,g
+import requests
 from queue import Queue
 from threading import Thread
 
@@ -9,13 +10,17 @@ HOME = Path(__file__).resolve().parent
 
 app = Flask(__name__)
 
-taskQueue = Queue()
+dbTasks = Queue()
+hookTasks = Queue()
 
-def worker():
+
+webhookSubscriber = "http://127.0.0.1:5001"
+
+def dbWorker():
     connection = sqlite3.connect(HOME / "forum.db")
     
     while True:
-        task = taskQueue.get()
+        task = dbTasks.get()
 
         try:
             if(task["type"] == "post"):
@@ -23,11 +28,21 @@ def worker():
                 dbHandle.addPost(connection,postData["author"],postData["title"],postData["content"])
             elif(task["type"] == "comment"):
                 commentData = task["data"]
-                dbHandle.addComment(connection,commentData["author"],commentData["content"],commentData["ID"])
+                commentID = dbHandle.addComment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
+                if(commentData["parentID"] != None):
+                    hookTasks.put({"commentID": commentID, "content": commentData["content"]})
         except Exception as err:
             print("DB error: ", err)
         finally:
-            taskQueue.task_done()
+            dbTasks.task_done()
+
+def hookWorker():
+    while True:
+        task = hookTasks.get()
+        requests.post(webhookSubscriber,params=task)
+        hookTasks.task_done()
+        
+        
 
 def get_connection():
     if "db" not in g:
@@ -54,16 +69,16 @@ def greeting():
 def post():
     data = request.get_json()
     postData = {"author": data["author"],"title":data["title"],"content":data["content"]}
-    taskQueue.put({"type":"post","data":postData})
+    dbTasks.put({"type":"post","data":postData})
     return "200"
 
 @app.route("/comment", methods=["POST"])
 def comment():
     data = request.get_json()
-    commentData = {"author": data["author"],"content":data["content"].strip(),"ID":data["ID"]}
-    print(commentData["content"])
+    commentData = {"author": data["author"],"content":data["content"].strip(),"postID":data["ID"],"parentID":data["parentID"]}
+    
     print("Comment on post: ", commentData["ID"])
-    taskQueue.put({"type":"comment","data":commentData})
+    dbTasks.put({"type":"comment","data":commentData})
     return "200"
 
 #TODO Validate the id to stop weird behaviour       
@@ -84,8 +99,10 @@ def randomPost():
 
     
 
-thread = Thread(target=worker,daemon=True)
-thread.start()
+dbWorker = Thread(target=dbWorker,daemon=True)
+hookWorker = Thread(target=hookWorker,daemon=True)
+dbWorker.start()
+hookWorker.start()
 
 if __name__ == "__main__":
     connection = sqlite3.connect(HOME / "forum.db")
