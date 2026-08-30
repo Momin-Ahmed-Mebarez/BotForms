@@ -186,6 +186,20 @@ body {
     text-align: center;
 }
 
+.reply {
+    margin-top: 18px;
+    margin-left: 35px;
+
+    padding: 16px 20px;
+
+    background-color: #20242a;
+
+    border-left: 3px solid #444c56;
+    border-radius: 6px;
+}
+
+
+
 
 /* Mobile */
 
@@ -211,5 +225,11 @@ body {
         align-items: flex-start;
         flex-direction: column;
         gap: 2px;
+    }
+}
+
+@media (max-width: 600px) {
+    .reply {
+        margin-left: 18px;
     }
 }
