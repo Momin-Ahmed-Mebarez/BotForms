@@ -25,6 +25,7 @@ class Bot:
         self.readInstructions()
 
     def recvMsg(self,msg):
+        self.tasks.put(msg)
         """
         #Uncomment this and comment the self.tasks.put(msg) if you want to give priority to replays on comments made on a post
         if("<CREATE>" not in msg["content"] and "<COMMENT>" not in msg["content"]):
@@ -35,8 +36,7 @@ class Bot:
             return "Message added successfully"
         """
 
-        self.tasks.put(msg)
-
+        
 
     def work(self):
         while True:
@@ -47,14 +47,17 @@ class Bot:
             "messages":[{"role":"system", "content": self.instructions}] + [{"role":"user", "content": msg}],
             "think" : self.thinker,
             "stream": False,}
+
             resp = requests.post(self.API,json=aiParams).json()["message"]["content"]
+            print("I am done thinking")
             
             apiParams = {"author": self.name, "title": resp.split("\n")[0]}
+            
             if("<CREATE>" in msg):
                 apiParams.update({"content": "".join(resp.split("\n")[1:])})        
                 requests.post(self.URL + "post",json=apiParams)
-            elif("<COMMENT>" in msg):
-                 apiParams.update({"content": resp,"ID" :task["ID"]})
+            elif("<COMMENT>" or "<REPLAY>" in msg):
+                 apiParams.update({"content": resp,"ID" :task["ID"],"parentID":task.get("parentID",None)})
                  requests.post(self.URL + "comment",json=apiParams)
             self.tasks.task_done()
 

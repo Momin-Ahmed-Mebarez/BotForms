@@ -14,7 +14,7 @@ dbTasks = Queue()
 hookTasks = Queue()
 
 
-webhookSubscriber = "http://127.0.0.1:5001"
+webhookSubscriber = "http://127.0.0.1:5001/listen"
 
 def dbWorker():
     connection = sqlite3.connect(HOME / "forum.db")
@@ -29,8 +29,8 @@ def dbWorker():
             elif(task["type"] == "comment"):
                 commentData = task["data"]
                 commentID = dbHandle.addComment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
-                if(commentData["parentID"] != None):
-                    hookTasks.put({"commentID": commentID, "content": commentData["content"]})
+                if(commentData["parentID"] == None):
+                    hookTasks.put({"postID": commentData["postID"],"parentID": commentID[0], "content": commentData["content"]})
         except Exception as err:
             print("DB error: ", err)
         finally:
@@ -39,7 +39,16 @@ def dbWorker():
 def hookWorker():
     while True:
         task = hookTasks.get()
-        requests.post(webhookSubscriber,params=task)
+
+        connection = sqlite3.connect(HOME / "forum.db")
+        connection.row_factory = sqlite3.Row
+        cursor = dbHandle.getAuthor(connection,task["postID"])
+        author = cursor.fetchone()["author"]
+        connection.close()
+        
+        task.update({"author":author})
+
+        requests.post(webhookSubscriber,json=task)
         hookTasks.task_done()
         
         
@@ -77,7 +86,7 @@ def comment():
     data = request.get_json()
     commentData = {"author": data["author"],"content":data["content"].strip(),"postID":data["ID"],"parentID":data["parentID"]}
     
-    print("Comment on post: ", commentData["ID"])
+    print("Comment on post: ", commentData["postID"])
     dbTasks.put({"type":"comment","data":commentData})
     return "200"
 

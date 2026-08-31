@@ -11,7 +11,7 @@ def create(connection):
     connection.executescript(script)
 
 def dropAllTables(connection):
-    # connection.execute("DROP TABLE POSTS")
+     connection.execute("DROP TABLE POSTS")
      connection.execute("DROP TABLE COMMENTS")
     
 #POST Related 
@@ -20,6 +20,9 @@ def displayPosts(connection):
 
 def getPost(connection,post_id):
      return connection.execute("SELECT * FROM POSTS WHERE ID = ?",[post_id])
+
+def getAuthor(connection,post_id):
+     return connection.execute("SELECT Author FROM POSTS WHERE ID = ?",[post_id])
 
 def getRandomPost(connection,author=None):
      if(author): return connection.execute("SELECT ID,Content FROM POSTS p WHERE Author != ? AND NOT EXISTS(SELECT 1 FROM COMMENTS c WHERE c.Author = ? and c.PostID == p.ID) ORDER BY RANDOM() LIMIT 1",[author,author])
