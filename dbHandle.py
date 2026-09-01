@@ -11,37 +11,38 @@ def create(connection):
     connection.executescript(script)
 
 def dropAllTables(connection):
-     connection.execute("DROP TABLE POSTS")
-     connection.execute("DROP TABLE COMMENTS")
+     connection.execute("DROP TABLE authors")
+     connection.execute("DROP TABLE posts")
+     connection.execute("DROP TABLE comments")
     
 #POST Related 
 def displayPosts(connection):
-     return connection.execute("SELECT ID,Author,Date,Title FROM POSTS")
+     return connection.execute("SELECT id,author,date,title FROM posts")
 
 def getPost(connection,post_id):
-     return connection.execute("SELECT * FROM POSTS WHERE ID = ?",[post_id])
+     return connection.execute("SELECT * FROM posts WHERE id = ?",[post_id])
 
 def getAuthor(connection,post_id):
-     return connection.execute("SELECT Author FROM POSTS WHERE ID = ?",[post_id])
+     return connection.execute("SELECT author FROM posts WHERE id = ?",[post_id])
 
 def getRandomPost(connection,author=None):
-     if(author): return connection.execute("SELECT ID,Content FROM POSTS p WHERE Author != ? AND NOT EXISTS(SELECT 1 FROM COMMENTS c WHERE c.Author = ? and c.PostID == p.ID) ORDER BY RANDOM() LIMIT 1",[author,author])
-     return connection.execute("SELECT ID,Content FROM POSTS ORDER BY RANDOM() LIMIT 1")
+     if(author): return connection.execute("SELECT id,content FROM posts p WHERE author != ? AND NOT EXISTS(SELECT 1 FROM comments c WHERE c.author = ? and c.post_id == p.id) ORDER BY RANDOM() LIMIT 1",[author,author])
+     return connection.execute("SELECT id,content FROM posts ORDER BY RANDOM() LIMIT 1")
 
 def addPost(connection,author,title,content):
      time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
-     connection.execute("INSERT INTO POSTS (Author,Date,Title,Content) VALUES (?,?,?,?);",[author,time,title,content])
+     connection.execute("INSERT INTO posts (author,date,title,content) VALUES (?,?,?,?);",[author,time,title,content])
      connection.commit()
 
 #Comment related
 def addComment(connection,author,content,postID,parentID=None):
      time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
-     cursor = connection.execute("INSERT INTO COMMENTS (Author,Date,Content,PostID,ParentID) VALUES (?,?,?,?,?) RETURNING ID;",[author,time,content,postID,parentID])
+     cursor = connection.execute("INSERT INTO comments (author,date,content,post_id,parent_id) VALUES (?,?,?,?,?) RETURNING id;",[author,time,content,postID,parentID])
      result = cursor.fetchone()
      connection.commit()
      return result
 
 def getComments(connection,postID):
-     return connection.execute("SELECT c.*,r.Content as ReplayContent FROM COMMENTS c LEFT JOIN COMMENTS r ON r.ParentID = c.ID WHERE c.PostID = ? AND c.ParentID IS NULL",[postID])
+     return connection.execute("SELECT c.*,r.content as ReplayContent FROM comments c LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
 
 
