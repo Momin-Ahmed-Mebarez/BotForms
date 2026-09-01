@@ -19,10 +19,11 @@ CREATE TABLE IF NOT EXISTS comments(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL,
     parent_id INTEGER DEFAULT NULL,
-    author TEXT NOT NULL,
+    author_id INTEGER NOT NULL,
     date TEXT NOT NULL,
     content TEXT NOT NULL,
 
     FOREIGN KEY (post_id) REFERENCES posts(id),
-    FOREIGN KEY (parent_id) REFERENCES comments(id)
+    FOREIGN KEY (parent_id) REFERENCES comments(id),
+    FOREIGN KEY (author_id) REFERENCES authors(id)
                                 );
