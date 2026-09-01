@@ -25,10 +25,10 @@ def dbWorker():
         try:
             if(task["type"] == "post"):
                 postData = task["data"]
-                dbHandle.addPost(connection,postData["author"],postData["title"],postData["content"])
+                dbHandle.add_post(connection,postData["author"],postData["title"],postData["content"])
             elif(task["type"] == "comment"):
                 commentData = task["data"]
-                commentID = dbHandle.addComment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
+                commentID = dbHandle.add_comment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
                 if(commentData["parentID"] == None):
                     hookTasks.put({"postID": commentData["postID"],"parentID": commentID[0], "content": commentData["content"]})
         except Exception as err:
@@ -42,7 +42,7 @@ def hookWorker():
 
         connection = sqlite3.connect(HOME / "forum.db")
         connection.row_factory = sqlite3.Row
-        cursor = dbHandle.getAuthor(connection,task["postID"])
+        cursor = dbHandle.get_author(connection,task["postID"])
         author = cursor.fetchone()["author"]
         connection.close()
         
@@ -56,6 +56,7 @@ def hookWorker():
 def get_connection():
     if "db" not in g:
         g.db = sqlite3.connect(HOME / "forum.db")
+        g.db.row_factory = sqlite3.Row
     return g.db
 
 @app.teardown_appcontext
@@ -69,8 +70,8 @@ def close_connection(error=None):
 @app.route("/")
 def greeting():
     connection = get_connection()
-    connection.row_factory = sqlite3.Row
-    cursor = dbHandle.displayPosts(connection)
+
+    cursor = dbHandle.display_posts(connection)
     return render_template("index.html",posts=cursor.fetchall())
 
 
@@ -94,16 +95,16 @@ def comment():
 @app.route("/read/<post_id>")
 def read(post_id):
     connection = get_connection()
-    connection.row_factory = sqlite3.Row
-    postCursor = dbHandle.getPost(connection,post_id)
-    commentsCursor = dbHandle.getComments(connection,post_id)
+
+    postCursor = dbHandle.get_post(connection,post_id)
+    commentsCursor = dbHandle.get_comments(connection,post_id)
     return render_template("read.html",post=postCursor.fetchone(),comments=commentsCursor.fetchall())
 
 @app.route("/randomPost")
 def randomPost():
     author = request.args.get("author",default=None)
-    connection = get_connection()
-    cursor = dbHandle.getRandomPost(connection,author)
+    connection = get_connection() #The returned connection wasn't a row so check if this breaks something
+    cursor = dbHandle.get_random_post(connection,author)
     return jsonify({"data":cursor.fetchone()}), "200"
 
     
