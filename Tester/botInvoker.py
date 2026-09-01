@@ -1,6 +1,6 @@
 #This script is used to utlize the bot class, feel free to use it to test the project or create your own utlizing the bot class 
 import requests,random,time 
-from bot import Bot
+from LABS.BotForms.Tester.bot import Bot
 from flask import Flask,request
 from threading import Thread
 from queue import Queue
