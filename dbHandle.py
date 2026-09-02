@@ -2,6 +2,7 @@
 #TODO Upload an empty version of the db then add it to the .gitignore (Sorry for that)
 from datetime import datetime
 from pathlib import Path
+import sqlite3
 
 
 HOME = Path(__file__).resolve().parent
@@ -12,6 +13,10 @@ def create(connection):
     connection.executescript(script)
 
 def drop_all_tables(connection):
+     """
+     Using executescript and dropping all tables with one statement is a better approach, but
+     this is better for debugging. 
+     """
      connection.execute("DROP TABLE authors")
      connection.execute("DROP TABLE posts")
      connection.execute("DROP TABLE comments")
@@ -23,28 +28,43 @@ def register_author(connection,name,hashedKey,webhook=None):
 
 #This method is only used for test purposes and can be commented out or removed.
 def register_author(connection,name):
-     pass
+     import random
+     key = random.randint(0,9999999999)
+     connection.execute("INSERT INTO authors (name,api_key) VALUES (:name,:api_key)",{"name":name,"api_key":key})
+     connection.commit()
 
+#This will be changed
 def get_author(connection,post_id):
      return connection.execute("SELECT author FROM posts WHERE id = ?",[post_id])
 
 #POST Related 
 def display_posts(connection):
-     return connection.execute("SELECT a.name,p.id,p.date,p.title FROM posts p LEFT JOIN authors a on p.author_id = a.id")
+     return connection.execute("SELECT a.name as author,p.id,p.date,p.title FROM posts p JOIN authors a ON p.author_id = a.id")
 
 def get_post(connection,post_id):
-     return connection.execute("SELECT * FROM posts WHERE id = ?",[post_id])
+     cursor = connection.execute("SELECT a.name as author,p.date,p.title,p.content FROM posts p JOIN authors a ON p.author_id = a.id WHERE p.id = ?",[post_id])
+     return cursor.fetchone()
 
-def get_random_post(connection,author=None):
-     if(author): return connection.execute("SELECT id,content FROM posts p WHERE author != ? AND NOT EXISTS(SELECT 1 FROM comments c WHERE c.author = ? and c.post_id == p.id) ORDER BY RANDOM() LIMIT 1",[author,author])
-     return connection.execute("SELECT id,content FROM posts ORDER BY RANDOM() LIMIT 1")
 
-def add_post(connection,author,title,content):
-     time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
-     connection.execute("INSERT INTO posts (author_id,date,title,content) VALUES (?,?,?,?);",[author,time,title,content])
-     connection.commit()
+def get_random_post(connection,author_id):
+     cursor = connection.execute("SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id ORDER BY RANDOM() LIMIT 1)",[author_id] * 2)
+     return cursor.fetchone()
+     
+     #Deprecated
+     #if(author): return connection.execute("SELECT id,content FROM posts p WHERE author != ? AND NOT EXISTS(SELECT 1 FROM comments c WHERE c.author = ? and c.post_id == p.id) ORDER BY RANDOM() LIMIT 1",[author,author])
+
+
+def add_post(connection,author_id,title,content):
+     stamp = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
+     try:
+          connection.execute("INSERT INTO posts (author_id,date,title,content) VALUES (:author_id,:date,:title,:content);",{"author_id": author_id,"date":stamp,"title":title,"content":content})
+          connection.commit()
+     except sqlite3.Error as err:
+          connection.rollback()
+          raise sqlite3.DatabaseError("Couldn't create post") from err
 
 #Comment related
+#This will be changed when I add authentication
 def add_comment(connection,author,content,postID,parentID=None):
      time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
      cursor = connection.execute("INSERT INTO comments (author,date,content,post_id,parent_id) VALUES (?,?,?,?,?) RETURNING id;",[author,time,content,postID,parentID])
@@ -53,6 +73,35 @@ def add_comment(connection,author,content,postID,parentID=None):
      return result
 
 def get_comments(connection,postID):
-     return connection.execute("SELECT c.*,r.content as ReplayContent FROM comments c LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
+     return connection.execute("SELECT a.name as author,c.id,c.post_id,c.parent_id,c.content,c.date,r.content as ReplayContent FROM comments c JOIN authors a ON a.id = c.author_id LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
 
 
+
+#Security related 
+def validate_author(api_key):
+     connection = sqlite3.connect(HOME / "forum.db")
+     try:
+          author = connection.execute("SELECT id from authors where api_key = ?",[api_key]).fetchone()
+     except Exception as err:
+          raise ValidationError("Error while validating user")
+     finally:
+          connection.close()     
+
+     return author
+
+#Helper
+#Currently not used
+def get_author_id_from_name(connection,name):
+     author = connection.execute("SELECT id from authors where name = ?",[name]).fetchone()
+     if(author):
+          return author["id"]
+     raise AuthorNotFoundException(f"{name} isn't a registered user")
+
+
+#Error classes
+#Currently not used since it was used with get_author_id_from_name
+class AuthorNotFoundException(Exception):
+     pass
+
+class ValidationError(Exception):
+     pass
