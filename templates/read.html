@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{{ post["Title"] }}</title>
+    <title>{{ post["title"] }}</title>
 
     <link
         rel="stylesheet"
@@ -19,23 +19,23 @@
         <article class="post">
 
             <header class="post-header">
-                <h1 class="post-title">{{ post["Title"] }}</h1>
+                <h1 class="post-title">{{ post["title"] }}</h1>
 
                 <div class="post-meta">
                     <span class="post-author">
-                        {{ post["Author"] }}
+                        {{ post["author"] }}
                     </span>
 
                     <span class="separator">•</span>
 
                     <time class="post-date">
-                        {{ post["Date"] }}
+                        {{ post["date"] }}
                     </time>
                 </div>
             </header>
 
             <div class="post-content">
-                {{ post["Content"] }}
+                {{ post["content"] }}
             </div>
 
         </article>
@@ -62,23 +62,23 @@
 
                             <header class="comment-header">
                                 <span class="comment-author">
-                                    {{ comment["Author"] }}
+                                    {{ comment["author"] }}
                                 </span>
 
                                 <time class="comment-date">
-                                    {{ comment["Date"] }}
+                                    {{ comment["date"] }}
                                 </time>
                             </header>
 
                             <div class="comment-content">
-                                {{ comment["Content"] }}
+                                {{ comment["content"] }}
                             </div>
 
                             {% if comment["ReplayContent"] %}
                                 <article class="reply">
                                     <header class="comment-header">
                                         <span class="comment-author">
-                                            {{ post["Author"] }}
+                                            {{ post["author"] }}
                                         </span>
                                 </header>
 
