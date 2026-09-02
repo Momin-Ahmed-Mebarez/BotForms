@@ -1,3 +1,4 @@
+#TODO Follow variable and functions conventions, this a bit urgent since I have mixed style currently
 from pathlib import Path
 import dbHandle
 import sqlite3
@@ -5,40 +6,44 @@ from flask import Flask,render_template,request,jsonify,g
 import requests
 from queue import Queue
 from threading import Thread
+from auth import authenticate,generate_api_key
+
 
 HOME = Path(__file__).resolve().parent
 
 app = Flask(__name__)
 
-dbTasks = Queue()
-hookTasks = Queue()
+db_tasks = Queue()
+hook_tasks = Queue()
 
 
-webhookSubscriber = "http://127.0.0.1:5001/listen"
+webhook_subscruber = "http://127.0.0.1:5001/listen"
 
+#I want to add an exception for connection errors so that I obtain a new connection if I lost the old one
 def dbWorker():
     connection = sqlite3.connect(HOME / "forum.db")
     
     while True:
-        task = dbTasks.get()
+        task = db_tasks.get()
 
         try:
             if(task["type"] == "post"):
                 postData = task["data"]
-                dbHandle.add_post(connection,postData["author"],postData["title"],postData["content"])
+                dbHandle.add_post(connection,postData["author_id"],postData["title"],postData["content"])
+            
             elif(task["type"] == "comment"):
                 commentData = task["data"]
                 commentID = dbHandle.add_comment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
                 if(commentData["parentID"] == None):
-                    hookTasks.put({"postID": commentData["postID"],"parentID": commentID[0], "content": commentData["content"]})
+                    hook_tasks.put({"postID": commentData["postID"],"parentID": commentID[0], "content": commentData["content"]})
         except Exception as err:
             print("DB error: ", err)
         finally:
-            dbTasks.task_done()
+            db_tasks.task_done()
 
 def hookWorker():
     while True:
-        task = hookTasks.get()
+        task = hook_tasks.get()
 
         connection = sqlite3.connect(HOME / "forum.db")
         connection.row_factory = sqlite3.Row
@@ -48,11 +53,11 @@ def hookWorker():
         
         task.update({"author":author})
 
-        requests.post(webhookSubscriber,json=task)
-        hookTasks.task_done()
+        requests.post(webhook_subscruber,json=task)
+        hook_tasks.task_done()
         
         
-
+#Creating db connections for reading and closing them
 def get_connection():
     if "db" not in g:
         g.db = sqlite3.connect(HOME / "forum.db")
@@ -70,42 +75,64 @@ def close_connection(error=None):
 @app.route("/")
 def greeting():
     connection = get_connection()
-
     cursor = dbHandle.display_posts(connection)
     return render_template("index.html",posts=cursor.fetchall())
 
 
 @app.route("/post", methods=["POST"])
+@authenticate
 def post():
-    data = request.get_json()
-    postData = {"author": data["author"],"title":data["title"],"content":data["content"]}
-    dbTasks.put({"type":"post","data":postData})
-    return "200"
+    author = g.author
+    data = request.get_json(silent=True)
 
+    if(not data or data.get("title",None) is None or data.get("content",None) is None):
+        return jsonify(error="Bad request"), 400
+    
+    post_data = {"author_id": author,"title":data["title"],"content":data["content"]}
+    db_tasks.put({"type":"post","data":post_data})
+    return jsonify({"data":"Post created successfully"}), 200
+
+#TODO Fix this route
 @app.route("/comment", methods=["POST"])
 def comment():
     data = request.get_json()
     commentData = {"author": data["author"],"content":data["content"].strip(),"postID":data["ID"],"parentID":data["parentID"]}
     
     print("Comment on post: ", commentData["postID"])
-    dbTasks.put({"type":"comment","data":commentData})
+    db_tasks.put({"type":"comment","data":commentData})
     return "200"
-
-#TODO Validate the id to stop weird behaviour       
+     
 @app.route("/read/<post_id>")
 def read(post_id):
     connection = get_connection()
 
-    postCursor = dbHandle.get_post(connection,post_id)
-    commentsCursor = dbHandle.get_comments(connection,post_id)
-    return render_template("read.html",post=postCursor.fetchone(),comments=commentsCursor.fetchall())
+    try:
+        test = int(post_id)
+        assert test > 0
+    except (ValueError,AssertionError):
+        return render_template("error.html",err="Invalid query")
+    except Exception as err:
+        return render_template("error.html",err="An unexpected error")
+
+    post_cursor = dbHandle.get_post(connection,post_id)
+    if(not post_cursor):
+        return render_template("error.html",err="Post doesn't exist")
+    
+    comments_cursor = dbHandle.get_comments(connection,post_id)
+    #This should be changed from fetchall to fetchmany so that we don't make the memory full
+    return render_template("read.html",post=post_cursor,comments=comments_cursor.fetchall())
+    
 
 @app.route("/randomPost")
+@authenticate
 def randomPost():
-    author = request.args.get("author",default=None)
-    connection = get_connection() #The returned connection wasn't a row so check if this breaks something
-    cursor = dbHandle.get_random_post(connection,author)
-    return jsonify({"data":cursor.fetchone()}), "200"
+    connection = get_connection() 
+    author = g.author
+
+    post = dbHandle.get_random_post(connection,author)
+    if(not post):
+        return jsonify({"data":"No more posts avaliable"}), 200
+    return jsonify({"data":{"id":post["id"],"content":post["content"]}}), 200
 
     
 
