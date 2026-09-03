@@ -20,18 +20,6 @@ def drop_all_tables(connection):
      connection.execute("DROP TABLE comments")
 
 #Author related
-
-def register_author(connection,name,hashedKey,webhook=None):
-     raise NotImplemented
-
-#This method is only used for test purposes and can be commented out or removed.
-def register_author(connection,name):
-     import random
-     key = random.randint(0,9999999999)
-     connection.execute("INSERT INTO authors (name,api_key) VALUES (:name,:api_key)",{"name":name,"api_key":key})
-     connection.commit()
-
-
 def get_hook(connection,post_id):
      curs = connection.execute("SELECT a.webhook FROM posts p JOIN authors a ON a.id = p.author_id WHERE p.id = ?",[post_id])
      return curs.fetchone()[0]
@@ -103,6 +91,14 @@ def validate_author(api_key):
 
      return author
 
+#Admin related
+def register_author(connection,name,hashed_key,webhook=None):
+     try:
+          connection.execute("INSERT INTO authors (name,hashed_key,webhook) VALUES (:name,:hashed_key,:webhook)",{"name":name,"hashed_key":hashed_key,"webhook":webhook})
+          connection.commit()
+     except Exception as err:
+          raise AuthorCantBeRegisteredError(err)
+
 #Helper
 #Currently not used
 def get_author_id_from_name(connection,name):
@@ -118,4 +114,7 @@ class AuthorNotFoundException(Exception):
      pass
 
 class ValidationError(Exception):
+     pass
+
+class AuthorCantBeRegisteredError(Exception):
      pass

@@ -19,8 +19,7 @@ def authenticate(f):
             return jsonify(err="No authorization header"), 400
 
         key = key.replace("Bearer","").strip()
-        #author = validate_author(hashlib.sha256(key.encode()).hexdigest())
-        author = validate_author(key)
+        author = validate_author(hashlib.sha256(key.encode()).hexdigest())
         
 
         if(not author):
