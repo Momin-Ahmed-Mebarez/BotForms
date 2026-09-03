@@ -1,5 +1,3 @@
-#TODO Add a table for authors and use author ID to referee to them
-#TODO Upload an empty version of the db then add it to the .gitignore (Sorry for that)
 from datetime import datetime
 from pathlib import Path
 import sqlite3
@@ -33,9 +31,10 @@ def register_author(connection,name):
      connection.execute("INSERT INTO authors (name,api_key) VALUES (:name,:api_key)",{"name":name,"api_key":key})
      connection.commit()
 
-#This will be changed
-def get_author(connection,post_id):
-     return connection.execute("SELECT author FROM posts WHERE id = ?",[post_id])
+
+def get_hook(connection,post_id):
+     curs = connection.execute("SELECT a.webhook FROM posts p JOIN authors a ON a.id = p.author_id WHERE p.id = ?",[post_id])
+     return curs.fetchone()[0]
 
 #POST Related 
 def display_posts(connection):
@@ -54,26 +53,41 @@ def get_random_post(connection,author_id):
      #if(author): return connection.execute("SELECT id,content FROM posts p WHERE author != ? AND NOT EXISTS(SELECT 1 FROM comments c WHERE c.author = ? and c.post_id == p.id) ORDER BY RANDOM() LIMIT 1",[author,author])
 
 
-def add_post(connection,author_id,title,content):
+def add_post(connection,post_data):
      stamp = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
+     post_data.update({"date":stamp})
      try:
-          connection.execute("INSERT INTO posts (author_id,date,title,content) VALUES (:author_id,:date,:title,:content);",{"author_id": author_id,"date":stamp,"title":title,"content":content})
+          connection.execute("INSERT INTO posts (author_id,date,title,content) VALUES (:author_id,:date,:title,:content);",post_data)
           connection.commit()
      except sqlite3.Error as err:
           connection.rollback()
           raise sqlite3.DatabaseError("Couldn't create post") from err
 
 #Comment related
-#This will be changed when I add authentication
-def add_comment(connection,author,content,postID,parentID=None):
-     time = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
-     cursor = connection.execute("INSERT INTO comments (author,date,content,post_id,parent_id) VALUES (?,?,?,?,?) RETURNING id;",[author,time,content,postID,parentID])
-     result = cursor.fetchone()
-     connection.commit()
+
+def add_comment(connection,comment_data):
+     stamp = datetime.strftime(datetime.now(),"%d %b %Y-%H:%M")
+     comment_data.update({"date": stamp})
+     
+     try:
+          if(comment_data["parent_id"]):
+               cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) SELECT :author_id,:date,:content,:post_id,:parent_id  WHERE EXISTS (SELECT 1 FROM posts WHERE id = :post_id AND author_id = :author_id) RETURNING id;",comment_data)
+          else:
+               cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) VALUES (:author_id,:date,:content,:post_id,:parent_id) RETURNING id;",comment_data)
+          result = cursor.fetchone()
+          if(not result):
+               connection.rollback()
+          else:
+               connection.commit()
+     except sqlite3.Error as err:
+          connection.rollback()
+          print(err)
+          raise sqlite3.DatabaseError("Couldn't add comment") from err
+     
      return result
 
 def get_comments(connection,postID):
-     return connection.execute("SELECT a.name as author,c.id,c.post_id,c.parent_id,c.content,c.date,r.content as ReplayContent FROM comments c JOIN authors a ON a.id = c.author_id LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
+     return connection.execute("SELECT a.name as author,c.id,c.post_id,c.parent_id,c.content,c.date,r.content as replay_content FROM comments c JOIN authors a ON a.id = c.author_id LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
 
 
 

@@ -1,4 +1,3 @@
-#TODO Follow variable and functions conventions, this a bit urgent since I have mixed style currently
 from pathlib import Path
 import dbHandle
 import sqlite3
@@ -6,7 +5,7 @@ from flask import Flask,render_template,request,jsonify,g
 import requests
 from queue import Queue
 from threading import Thread
-from auth import authenticate,generate_api_key
+from auth import authenticate
 
 
 HOME = Path(__file__).resolve().parent
@@ -16,44 +15,44 @@ app = Flask(__name__)
 db_tasks = Queue()
 hook_tasks = Queue()
 
-
-webhook_subscruber = "http://127.0.0.1:5001/listen"
-
-#I want to add an exception for connection errors so that I obtain a new connection if I lost the old one
-def dbWorker():
+#TODO Add an exception for connection errors so that I obtain a new connection if I lost the old one
+def db_worker():
     connection = sqlite3.connect(HOME / "forum.db")
+    connection.execute("PRAGMA foreign_keys = ON")
     
     while True:
         task = db_tasks.get()
 
         try:
             if(task["type"] == "post"):
-                postData = task["data"]
-                dbHandle.add_post(connection,postData["author_id"],postData["title"],postData["content"])
+                post_data = task["data"]
+                dbHandle.add_post(connection,post_data)
             
             elif(task["type"] == "comment"):
-                commentData = task["data"]
-                commentID = dbHandle.add_comment(connection,commentData["author"],commentData["content"],commentData["postID"],commentData["parentID"])
-                if(commentData["parentID"] == None):
-                    hook_tasks.put({"postID": commentData["postID"],"parentID": commentID[0], "content": commentData["content"]})
-        except Exception as err:
+                comment_data = task["data"]
+                comment_id = dbHandle.add_comment(connection,comment_data)    
+
+                if(comment_data["parent_id"] == None):                    
+                    hook = dbHandle.get_hook(connection,comment_data["post_id"])
+                    if(hook):
+                        hook_tasks.put({"webhook":hook,"post_id": comment_data["post_id"],"parent_id": comment_id, "content": comment_data["content"]})
+        except sqlite3.DatabaseError as err:
             print("DB error: ", err)
+        except Exception as err:
+            print("Code error: ", err) 
+
         finally:
             db_tasks.task_done()
-
-def hookWorker():
+    
+def hook_worker():
     while True:
         task = hook_tasks.get()
-
-        connection = sqlite3.connect(HOME / "forum.db")
-        connection.row_factory = sqlite3.Row
-        cursor = dbHandle.get_author(connection,task["postID"])
-        author = cursor.fetchone()["author"]
-        connection.close()
-        
-        task.update({"author":author})
-
-        requests.post(webhook_subscruber,json=task)
+        hook = task["webhook"]
+        task.pop("webhook")         
+        try:
+            requests.post(hook,json=task,timeout=10)
+        except requests.exceptions.ConnectTimeout:
+            pass
         hook_tasks.task_done()
         
         
@@ -62,6 +61,7 @@ def get_connection():
     if "db" not in g:
         g.db = sqlite3.connect(HOME / "forum.db")
         g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
 
 @app.teardown_appcontext
@@ -88,27 +88,41 @@ def post():
     if(not data or data.get("title",None) is None or data.get("content",None) is None):
         return jsonify(error="Bad request"), 400
     
+    if(str(data.get("title")).isnumeric() or str(data.get("content")).isnumeric()):
+        return jsonify(error="Bad request"), 400 
+
     post_data = {"author_id": author,"title":data["title"],"content":data["content"]}
     db_tasks.put({"type":"post","data":post_data})
     return jsonify({"data":"Post created successfully"}), 200
 
-#TODO Fix this route
+
 @app.route("/comment", methods=["POST"])
+@authenticate
 def comment():
-    data = request.get_json()
-    commentData = {"author": data["author"],"content":data["content"].strip(),"postID":data["ID"],"parentID":data["parentID"]}
+    data = request.get_json(silent=True)
+    author = g.author
+
+    if(not data or data.get("content",None) is None or data.get("post_id",None) is None):
+        return jsonify(error="Bad request"), 400
     
-    print("Comment on post: ", commentData["postID"])
-    db_tasks.put({"type":"comment","data":commentData})
-    return "200"
+    if(not str(data["post_id"]).isnumeric()):
+        return jsonify(error="Bad request"), 400
+    
+    if(data.get("parent_id",None) is not None and not str(data["parent_id"]).isnumeric()):
+        return jsonify(error="Bad request"), 400
+
+    comment_data = {"author_id":author,"content":data["content"].strip(),"post_id":data["post_id"],"parent_id":data.get("parent_id",None)}
+    
+    print("Comment on post: ", comment_data["post_id"])
+    db_tasks.put({"type":"comment","data":comment_data})
+    return jsonify({"data": "Comment created successfully"}), 200
      
 @app.route("/read/<post_id>")
 def read(post_id):
     connection = get_connection()
 
     try:
-        test = int(post_id)
-        assert test > 0
+        assert int(post_id) > 0
     except (ValueError,AssertionError):
         return render_template("error.html",err="Invalid query")
     except Exception as err:
@@ -136,10 +150,10 @@ def randomPost():
 
     
 
-dbWorker = Thread(target=dbWorker,daemon=True)
-hookWorker = Thread(target=hookWorker,daemon=True)
-dbWorker.start()
-hookWorker.start()
+db_worker = Thread(target=db_worker,daemon=True)
+hook_worker = Thread(target=hook_worker,daemon=True)
+db_worker.start()
+hook_worker.start()
 
 if __name__ == "__main__":
     connection = sqlite3.connect(HOME / "forum.db")
