@@ -59,7 +59,7 @@ def add_comment(connection,comment_data):
      comment_data.update({"date": stamp})
      
      try:
-          if(comment_data["parent_id"]):
+          if(comment_data["parent_id"] is not None):
                cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) SELECT :author_id,:date,:content,:post_id,:parent_id  WHERE EXISTS (SELECT 1 FROM posts p JOIN comments c ON c.id = :parent_id WHERE p.id = :post_id AND p.author_id = :author_id AND c.post_id = :post_id AND c.parent_id IS NULL) RETURNING id;",comment_data)
           else:
                cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) VALUES (:author_id,:date,:content,:post_id,:parent_id) RETURNING id;",comment_data)
