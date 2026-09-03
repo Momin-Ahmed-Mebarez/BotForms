@@ -12,6 +12,7 @@ HOME = Path(__file__).resolve().parent
 
 app = Flask(__name__)
 
+#Will look to limit the queue later
 db_tasks = Queue()
 hook_tasks = Queue()
 
@@ -51,9 +52,10 @@ def hook_worker():
         task.pop("webhook")         
         try:
             requests.post(hook,json=task,timeout=10)
-        except requests.exceptions.ConnectTimeout:
+        except Exception as err:
             pass
-        hook_tasks.task_done()
+        finally:
+            hook_tasks.task_done()
         
         
 #Creating db connections for reading and closing them
@@ -76,6 +78,7 @@ def close_connection(error=None):
 def greeting():
     connection = get_connection()
     cursor = dbHandle.display_posts(connection)
+    #Fetch all will cause problems if there are many posts (check pagination)
     return render_template("index.html",posts=cursor.fetchall())
 
 
@@ -84,16 +87,16 @@ def greeting():
 def post():
     author = g.author
     data = request.get_json(silent=True)
-
-    if(not data or data.get("title",None) is None or data.get("content",None) is None):
-        return jsonify(error="Bad request"), 400
     
-    if(str(data.get("title")).isnumeric() or str(data.get("content")).isnumeric()):
-        return jsonify(error="Bad request"), 400 
+    if (not data or not isinstance(data.get("title",None), str) or not isinstance(data.get("content",None), str)):
+        return jsonify(error="Bad request"), 400
+
+    if(data.get("title").strip() == "" or data.get("content").strip() == ""):
+        return jsonify(error="Bad request"), 400
 
     post_data = {"author_id": author,"title":data["title"],"content":data["content"]}
     db_tasks.put({"type":"post","data":post_data})
-    return jsonify({"data":"Post created successfully"}), 200
+    return jsonify({"data":"Accepted post creation"}), 202
 
 
 @app.route("/comment", methods=["POST"])
@@ -102,28 +105,36 @@ def comment():
     data = request.get_json(silent=True)
     author = g.author
 
-    if(not data or data.get("content",None) is None or data.get("post_id",None) is None):
-        return jsonify(error="Bad request"), 400
-    
-    if(not str(data["post_id"]).isnumeric()):
-        return jsonify(error="Bad request"), 400
-    
-    if(data.get("parent_id",None) is not None and not str(data["parent_id"]).isnumeric()):
+    try:
+        data["content"] = data["content"].strip()
+        
+        if (data["content"] == ""):
+            raise Exception
+        
+        if (int(data["post_id"]) <= 0):
+            raise Exception
+
+        if(data.get("parent_id") is not None):
+            if (int(data["parent_id"]) <= 0):
+                raise Exception
+
+    except Exception:
         return jsonify(error="Bad request"), 400
 
-    comment_data = {"author_id":author,"content":data["content"].strip(),"post_id":data["post_id"],"parent_id":data.get("parent_id",None)}
+    comment_data = {"author_id":author,"content":data["content"],"post_id":data["post_id"],"parent_id":data.get("parent_id",None)}
     
     print("Comment on post: ", comment_data["post_id"])
     db_tasks.put({"type":"comment","data":comment_data})
-    return jsonify({"data": "Comment created successfully"}), 200
+    return jsonify({"data": "Accepted comment creatoin"}), 202
      
-@app.route("/read/<post_id>")
+@app.route("/read/<int:post_id>")
 def read(post_id):
     connection = get_connection()
 
     try:
-        assert int(post_id) > 0
-    except (ValueError,AssertionError):
+        if post_id <= 0:
+            raise ValueError
+    except (ValueError):
         return render_template("error.html",err="Invalid query")
     except Exception as err:
         return render_template("error.html",err="An unexpected error")
@@ -133,7 +144,7 @@ def read(post_id):
         return render_template("error.html",err="Post doesn't exist")
     
     comments_cursor = dbHandle.get_comments(connection,post_id)
-    #This should be changed from fetchall to fetchmany so that we don't make the memory full
+    #Fetch will cause memory issue if there are many comments
     return render_template("read.html",post=post_cursor,comments=comments_cursor.fetchall())
     
 
@@ -148,17 +159,17 @@ def randomPost():
         return jsonify({"data":"No more posts avaliable"}), 200
     return jsonify({"data":{"id":post["id"],"content":post["content"]}}), 200
 
-    
-
-db_worker = Thread(target=db_worker,daemon=True)
-hook_worker = Thread(target=hook_worker,daemon=True)
-db_worker.start()
-hook_worker.start()
 
 if __name__ == "__main__":
     connection = sqlite3.connect(HOME / "forum.db")
     dbHandle.create(connection)
     connection.close()
+
+    db_thread = Thread(target=db_worker,daemon=True)
+    hook_thread = Thread(target=hook_worker,daemon=True)
+    db_thread.start()
+    hook_thread.start()
+
     app.run(debug=True)
 
 
