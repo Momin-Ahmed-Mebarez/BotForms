@@ -20,6 +20,7 @@ def authenticate(f):
 
         key = key.replace("Bearer","").strip()
         author = validate_author(hashlib.sha256(key.encode()).hexdigest())
+        #author = validate_author(key)
         
 
         if(not author):

@@ -15,10 +15,11 @@ def drop_all_tables(connection):
      Using executescript and dropping all tables with one statement is a better approach, but
      this is better for debugging. 
      """
-     connection.execute("DROP TABLE authors")
-     connection.execute("DROP TABLE posts")
      connection.execute("DROP TABLE comments")
-
+     connection.execute("DROP TABLE posts")
+     connection.execute("DROP TABLE authors")
+     
+     
 #Author related
 def get_hook(connection,post_id):
      curs = connection.execute("SELECT a.webhook FROM posts p JOIN authors a ON a.id = p.author_id WHERE p.id = ?",[post_id])
@@ -34,7 +35,7 @@ def get_post(connection,post_id):
 
 
 def get_random_post(connection,author_id):
-     cursor = connection.execute("SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id ORDER BY RANDOM() LIMIT 1)",[author_id] * 2)
+     cursor = connection.execute("SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id) ORDER BY RANDOM() LIMIT 1",[author_id] * 2)
      return cursor.fetchone()
      
      #Deprecated
@@ -59,7 +60,7 @@ def add_comment(connection,comment_data):
      
      try:
           if(comment_data["parent_id"]):
-               cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) SELECT :author_id,:date,:content,:post_id,:parent_id  WHERE EXISTS (SELECT 1 FROM posts WHERE id = :post_id AND author_id = :author_id) RETURNING id;",comment_data)
+               cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) SELECT :author_id,:date,:content,:post_id,:parent_id  WHERE EXISTS (SELECT 1 FROM posts p JOIN comments c ON c.id = :parent_id WHERE p.id = :post_id AND p.author_id = :author_id AND c.post_id = :post_id AND c.parent_id IS NULL) RETURNING id;",comment_data)
           else:
                cursor = connection.execute("INSERT INTO comments (author_id,date,content,post_id,parent_id) VALUES (:author_id,:date,:content,:post_id,:parent_id) RETURNING id;",comment_data)
           result = cursor.fetchone()
@@ -85,7 +86,7 @@ def validate_author(api_key):
      try:
           author = connection.execute("SELECT id from authors where api_key = ?",[api_key]).fetchone()
      except Exception as err:
-          raise ValidationError("Error while validating user")
+          raise ValidationError("Error while validating user") from err
      finally:
           connection.close()     
 
@@ -94,19 +95,21 @@ def validate_author(api_key):
 #Admin related
 def register_author(connection,name,hashed_key,webhook=None):
      try:
-          connection.execute("INSERT INTO authors (name,hashed_key,webhook) VALUES (:name,:hashed_key,:webhook)",{"name":name,"hashed_key":hashed_key,"webhook":webhook})
+          connection.execute("INSERT INTO authors (name,api_key,webhook) VALUES (:name,:api_key,:webhook)",{"name":name,"api_key":hashed_key,"webhook":webhook})
           connection.commit()
      except Exception as err:
+          connection.rollback()
           raise AuthorCantBeRegisteredError(err)
 
 #Helper
-#Currently not used
+
+"""
 def get_author_id_from_name(connection,name):
      author = connection.execute("SELECT id from authors where name = ?",[name]).fetchone()
      if(author):
           return author["id"]
      raise AuthorNotFoundException(f"{name} isn't a registered user")
-
+"""
 
 #Error classes
 #Currently not used since it was used with get_author_id_from_name
