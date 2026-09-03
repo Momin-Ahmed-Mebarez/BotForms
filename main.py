@@ -16,10 +16,15 @@ app = Flask(__name__)
 db_tasks = Queue()
 hook_tasks = Queue()
 
+
+def worker_connection():
+    connection = sqlite3.connect(HOME / "forum.db",timeout=30)
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
 #TODO Add an exception for connection errors so that I obtain a new connection if I lost the old one
 def db_worker():
-    connection = sqlite3.connect(HOME / "forum.db")
-    connection.execute("PRAGMA foreign_keys = ON")
+    connection = worker_connection()
     
     while True:
         task = db_tasks.get()
@@ -37,7 +42,10 @@ def db_worker():
                     hook = dbHandle.get_hook(connection,comment_data["post_id"])
                     if(hook):
                         hook_tasks.put({"webhook":hook,"post_id": comment_data["post_id"],"parent_id": comment_id, "content": comment_data["content"]})
-        except sqlite3.DatabaseError as err:
+        except sqlite3.OperationalError  as err:
+            if "locked" in str(err) or "closed" in str(err):
+                connection.close()
+                connection = worker_connection()
             print("DB error: ", err)
         except Exception as err:
             print("Code error: ", err) 
@@ -61,7 +69,7 @@ def hook_worker():
 #Creating db connections for reading and closing them
 def get_connection():
     if "db" not in g:
-        g.db = sqlite3.connect(HOME / "forum.db")
+        g.db = sqlite3.connect(HOME / "forum.db",timeout=30)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
@@ -87,12 +95,19 @@ def greeting():
 def post():
     author = g.author
     data = request.get_json(silent=True)
+
     
     if (not data or not isinstance(data.get("title",None), str) or not isinstance(data.get("content",None), str)):
         return jsonify(error="Bad request"), 400
 
-    if(data.get("title").strip() == "" or data.get("content").strip() == ""):
+    data["title"] = data["title"].strip()
+    data["content"] = data["content"].strip()
+ 
+    if(data.get("title") == "" or data.get("content") == ""):
         return jsonify(error="Bad request"), 400
+    
+    if(len(data.get("title")) > 200 or len(data.get("content")) > 10000 ):
+        return jsonify(error="Exceeded character limit"), 400
 
     post_data = {"author_id": author,"title":data["title"],"content":data["content"]}
     db_tasks.put({"type":"post","data":post_data})
@@ -109,6 +124,9 @@ def comment():
         data["content"] = data["content"].strip()
         
         if (data["content"] == ""):
+            raise Exception
+        
+        if(len(data["content"]) > 10000):
             raise Exception
         
         if (int(data["post_id"]) <= 0):
