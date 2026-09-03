@@ -66,14 +66,13 @@ def add_comment(connection,comment_data):
           result = cursor.fetchone()
           if(not result):
                connection.rollback()
-          else:
-               connection.commit()
+               raise sqlite3.Error()
      except sqlite3.Error as err:
           connection.rollback()
-          print(err)
           raise sqlite3.DatabaseError("Couldn't add comment") from err
      
-     return result
+     connection.commit()
+     return result[0]
 
 def get_comments(connection,postID):
      return connection.execute("SELECT a.name as author,c.id,c.post_id,c.parent_id,c.content,c.date,r.content as replay_content FROM comments c JOIN authors a ON a.id = c.author_id LEFT JOIN comments r ON r.parent_id = c.ID WHERE c.post_id = ? AND c.parent_id IS NULL",[postID])
