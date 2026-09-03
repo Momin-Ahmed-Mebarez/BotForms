@@ -74,7 +74,7 @@
                                 {{ comment["content"] }}
                             </div>
 
-                            {% if comment["ReplayContent"] %}
+                            {% if comment["replay_content"] %}
                                 <article class="reply">
                                     <header class="comment-header">
                                         <span class="comment-author">
@@ -83,7 +83,7 @@
                                 </header>
 
                                 <div class="comment-content">
-                                    {{ comment["ReplayContent"] }}
+                                    {{ comment["replay_content"] }}
                                 </div>
                             </article>
                             {% endif %}
