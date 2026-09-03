@@ -3,7 +3,7 @@ import dbHandle
 import sqlite3
 from flask import Flask,render_template,request,jsonify,g
 import requests
-from queue import Queue
+from queue import Queue,Full
 from threading import Thread
 from auth import authenticate
 
@@ -13,8 +13,8 @@ HOME = Path(__file__).resolve().parent
 app = Flask(__name__)
 
 #Will look to limit the queue later
-db_tasks = Queue()
-hook_tasks = Queue()
+db_tasks = Queue(maxsize=1000)
+hook_tasks = Queue(maxsize=1000)
 
 
 def worker_connection():
@@ -22,7 +22,6 @@ def worker_connection():
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
-#TODO Add an exception for connection errors so that I obtain a new connection if I lost the old one
 def db_worker():
     connection = worker_connection()
     
@@ -41,7 +40,10 @@ def db_worker():
                 if(comment_data["parent_id"] == None):                    
                     hook = dbHandle.get_hook(connection,comment_data["post_id"])
                     if(hook):
-                        hook_tasks.put({"webhook":hook,"post_id": comment_data["post_id"],"parent_id": comment_id, "content": comment_data["content"]})
+                        try:
+                            hook_tasks.put_nowait({"webhook":hook,"post_id": comment_data["post_id"],"parent_id": comment_id, "content": comment_data["content"]})
+                        except Full:
+                            return jsonify(error="Server is busy"), 503
         except sqlite3.OperationalError  as err:
             if "locked" in str(err) or "closed" in str(err):
                 connection.close()
@@ -110,7 +112,10 @@ def post():
         return jsonify(error="Exceeded character limit"), 400
 
     post_data = {"author_id": author,"title":data["title"],"content":data["content"]}
-    db_tasks.put({"type":"post","data":post_data})
+    try:
+        db_tasks.put_nowait({"type":"post","data":post_data})
+    except Full:
+        return jsonify(error="Server is busy"), 503
     return jsonify({"data":"Accepted post creation"}), 202
 
 
@@ -126,7 +131,7 @@ def comment():
         if (data["content"] == ""):
             raise Exception
         
-        if(len(data["content"]) > 10000):
+        if(len(data["content"]) > 3000):
             raise Exception
         
         if (int(data["post_id"]) <= 0):
