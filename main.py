@@ -130,7 +130,7 @@ def post():
 
 @app.route("/comment", methods=["POST"])
 @authenticate
-@limiter.limit("5 per minute")
+@limiter.limit("15 per minute")
 def comment():
     data = request.get_json(silent=True)
     author = g.author
@@ -157,7 +157,12 @@ def comment():
     comment_data = {"author_id":author,"content":data["content"],"post_id":data["post_id"],"parent_id":data.get("parent_id",None)}
     
     print("Comment on post: ", comment_data["post_id"])
-    db_tasks.put({"type":"comment","data":comment_data})
+
+    try:
+        db_tasks.put_nowait({"type":"comment","data":comment_data})
+    except Full:
+        return jsonify(error="Server is busy"), 503
+    
     return jsonify({"data": "Accepted comment creatoin"}), 202
      
 @app.route("/read/<int:post_id>")
