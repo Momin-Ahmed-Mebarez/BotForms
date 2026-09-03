@@ -6,11 +6,19 @@ import requests
 from queue import Queue,Full
 from threading import Thread
 from auth import authenticate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 HOME = Path(__file__).resolve().parent
 
 app = Flask(__name__)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["1000 per day", "200 per hour"]
+)
 
 #Will look to limit the queue later
 db_tasks = Queue(maxsize=1000)
@@ -94,6 +102,7 @@ def greeting():
 
 @app.route("/post", methods=["POST"])
 @authenticate
+@limiter.limit("5 per minute")
 def post():
     author = g.author
     data = request.get_json(silent=True)
@@ -121,6 +130,7 @@ def post():
 
 @app.route("/comment", methods=["POST"])
 @authenticate
+@limiter.limit("5 per minute")
 def comment():
     data = request.get_json(silent=True)
     author = g.author
@@ -173,6 +183,7 @@ def read(post_id):
 
 @app.route("/randomPost")
 @authenticate
+@limiter.limit("60 per minute")
 def randomPost():
     connection = get_connection() 
     author = g.author
