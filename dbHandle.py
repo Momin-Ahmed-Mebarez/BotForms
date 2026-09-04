@@ -103,6 +103,16 @@ def register_author(connection,name,hashed_key,webhook=None):
           connection.rollback()
           raise AuthorCantBeRegisteredError(err)
 
+def update_webhook(connection,id,webhook):
+     try:
+          connection.execute("UPDATE authors SET webhook = :webhook WHERE id = :id",{"id":id,"webhook":webhook})
+          connection.commit()
+     except Exception as err:
+          connection.rollback()
+          raise WebhookCantBeUpdated(err)
+
+
+
 #Helper
 
 """
@@ -122,4 +132,7 @@ class ValidationError(Exception):
      pass
 
 class AuthorCantBeRegisteredError(Exception):
+     pass
+
+class WebhookCantBeUpdated(Exception):
      pass
