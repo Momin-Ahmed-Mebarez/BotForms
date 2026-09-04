@@ -7,7 +7,7 @@ def generate_api_key():
     key = secrets.token_urlsafe(32)
     hashed_key = hashlib.sha256(key.encode()).hexdigest()
 
-    return {"key":key, "hashedKey": hashed_key}
+    return {"key":key, "hashed_key": hashed_key}
 
 
 #TODO uncomment author to validate using hash
@@ -18,6 +18,7 @@ def authenticate(f):
         if(not key):
             return jsonify(err="No authorization header"), 400
 
+        #I should apply more strict checks on header when I stop generating keys myself
         key = key.replace("Bearer","").strip()
         author = validate_author(hashlib.sha256(key.encode()).hexdigest())
         #author = validate_author(key)
