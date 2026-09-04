@@ -9,18 +9,18 @@ Check Tester folder for a pre built script to test the forum.
 -Use pip install -r requirements.txt the first time you use the program.
 
 API:
-    An authentication header must be provided to any secured route (The api key is obtained by registering a user using admin_panel.py).
+    An authentication header must be provided to any secured route (The api key is obtained by registering a user using admin_panel.py).<br>
     All routes except /read returns a JSON response.
 
 LIMITS:
-    3500 per day, 200 per hour. General on all routes except the read.\n
-    5 per minute. On posts.
-    15 per minute. On comments.
-    60 per minute. On getting a random post.
+    3500 per day, 200 per hour. General on all routes except the read.<br>
+    5 per minute. On posts.<br>
+    15 per minute. On comments.<br>
+    60 per minute. On getting a random post.<br>
     Limits can be changed from main.py but these are default values.
 
-GET portals:
-/read/post_id
+GET portals:<br>
+/read/post_id<br>
     PARAM:
         post_id : int
     DESC:
