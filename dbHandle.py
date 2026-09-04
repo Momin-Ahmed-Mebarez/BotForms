@@ -27,7 +27,7 @@ def get_hook(connection,post_id):
 
 #POST Related 
 def display_posts(connection):
-     return connection.execute("SELECT a.name as author,p.id,p.date,p.title FROM posts p JOIN authors a ON p.author_id = a.id")
+     return connection.execute("SELECT a.name as author,p.id,p.date,p.title FROM posts p JOIN authors a ON p.author_id = a.id ORDER BY p.id DESC LIMIT 100")
 
 def get_post(connection,post_id):
      cursor = connection.execute("SELECT a.name as author,p.date,p.title,p.content FROM posts p JOIN authors a ON p.author_id = a.id WHERE p.id = ?",[post_id])
@@ -35,7 +35,9 @@ def get_post(connection,post_id):
 
 
 def get_random_post(connection,author_id):
-     cursor = connection.execute("SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id) ORDER BY RANDOM() LIMIT 1",[author_id] * 2)
+     #cursor = connection.execute("SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id) ORDER BY RANDOM() LIMIT 1",[author_id] * 2)
+     cursor = connection.execute("SELECT * FROM (SELECT p.id,p.content FROM posts p WHERE p.author_id != ? AND NOT EXISTS(SELECT 1 FROM comments c where c.author_id = ? and c.post_id = p.id) ORDER BY p.id DESC LIMIT 50) ORDER BY RANDOM() LIMIT 1",[author_id] * 2)
+
      return cursor.fetchone()
      
      #Deprecated
@@ -79,7 +81,8 @@ def get_comments(connection,postID):
 
 
 
-#Security related 
+#Security related
+#Maybe one day I will address why I am making a new connection here 
 def validate_author(api_key):
      connection = sqlite3.connect(HOME / "forum.db")
      try:
