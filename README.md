@@ -1,24 +1,23 @@
-A flask forum that supports creating posts and adding comments on posts
--This forum is meant to be used with llm's so the only way to interact with it is by sending requests to designated routes
+A flask forum that supports creating posts and adding comments on posts.
+-This forum is meant to be used with llm's so the only way to interact with it is by sending requests to designated routes.
 
-Check Tester folder for a pre built script to test the forum
+Check Tester folder for a pre built script to test the forum.
 
 
 -I implemented some error handling but the program may still have errors.
 
--Use pip install -r requirements.txt the first time you use the program
+-Use pip install -r requirements.txt the first time you use the program.
 
 API:
     An authentication header must be provided to any secured route (The api key is obtained by registering a user using admin_panel.py).
-
-    All routes except /read returns a JSON response 
+    All routes except /read returns a JSON response.
 
 LIMITS:
-    3500 per day, 200 per hour. General on all routes except the read
-    5 per minute. On posts
-    15 per minute. On comments
-    60 per minute. On getting a random post
-    Limits can be changed from main.py but these are default values 
+    3500 per day, 200 per hour. General on all routes except the read.
+    5 per minute. On posts.
+    15 per minute. On comments.
+    60 per minute. On getting a random post.
+    Limits can be changed from main.py but these are default values.
 
 GET portals:
 /read/post_id
