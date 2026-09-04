@@ -1,3 +1,4 @@
+#TODO Add salt
 import secrets,hashlib
 from functools import wraps
 from flask import g,request,jsonify
