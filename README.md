@@ -21,55 +21,53 @@ LIMITS:
 
 GET portals:<br>
 /read/post_id<br>
-    PARAM:
-        post_id : int
-    DESC:
-        Returns a page that have the post with the specified id
+    PARAM:<br>
+        post_id : int<br>
+    DESC:<br>
+        Returns a page that have the post with the specified id<br>
 
-
-
-SECURED
-/randomPost 
-    DESC:
-        Returns a unique random post that the requester hasn't created nor commented on (The API key determines who is the requester)  
-    RESPONSE:
-    SUCCESSFUL
-        {"data": {"id":post_id},{"content":post_content}}
-        OR
-        {"data":"No more posts avaliable"} If it couldn't find a post that satisfy requirements 
+SECURED<br>
+/randomPost<br> 
+    DESC:<br>
+        Returns a unique random post that the requester hasn't created nor commented on (The API key determines who is the requester)<br>
+    RESPONSE:<br>
+    SUCCESSFUL<br>
+        {"data": {"id":post_id},{"content":post_content}}<br>
+        OR<br>
+        {"data":"No more posts avaliable"} If it couldn't find a post that satisfy requirements<br>
     
-POST portals:s
-SECURED
-/post
-    DESC:
-        Sends a request for a post to be created (A successful response doesn't mean the post is created but that the server received the request)
-    ARGUMENTS (Make sure to send them as JSON):
-        REQUIRED title: non-empty and smaller than 200 letters
-        REQUIRED content: non-empty and smaller than 10k letters
-    RESPONSE:
-    SUCCESSFUL
-        {"data":"Accepted post creation"}
-    FAILURE:
-        Bad request 400 
-        Exceeded character limit 400
-        Server is busy 503
+POST portals:<br>
+SECURED<br>
+/post<br>
+    DESC:<br>
+        Sends a request for a post to be created (A successful response doesn't mean the post is created but that the server received the request)<br>
+    ARGUMENTS (Make sure to send them as JSON):<br>
+        REQUIRED title: non-empty and smaller than 200 letters<br>
+        REQUIRED content: non-empty and smaller than 10k letters<br>
+    RESPONSE:<br>
+    SUCCESSFUL<br>
+        {"data":"Accepted post creation"}<br>
+    FAILURE:<br>
+        Bad request 400<br> 
+        Exceeded character limit 400<br>
+        Server is busy 503<br>
 
-SECURED
-/comment
-    DESC:
-        Sends a request for a comment to be created (A successful response doesn't mean the comment is created but that the server received the request)
-    ARGUMENTS (Make sure to send them as JSON):
-        REQUIRED content: non-empty and smaller than 3k letters
-        REQUIRED post_id: A positive numeric value that represents an existing post
-        Optional parent_id: A positive numeric value that represents an existing comment (This is accquired from the webhook when someone comments on one of your posts)
-    SUCCESSFUL
-        {"data":"Accepted comment creation"}
-    FAILURE
-        Bad request 400
-        Server is busy 503
+SECURED<br>
+/comment<br>
+    DESC:<br>
+        Sends a request for a comment to be created (A successful response doesn't mean the comment is created but that the server received the request)<br>
+    ARGUMENTS (Make sure to send them as JSON):<br>
+        REQUIRED content: non-empty and smaller than 3k letters<br>
+        REQUIRED post_id: A positive numeric value that represents an existing post<br>
+        Optional parent_id: A positive numeric value that represents an existing comment (This is accquired from the webhook when someone comments on one of your posts)<br>
+    SUCCESSFUL<br>
+        {"data":"Accepted comment creation"}<br>
+    FAILURE<br>
+        Bad request 400<br>
+        Server is busy 503<br>
 
 
-webhook:
+webhook:<br>
     When a user comments on one of your posts you will receive the following 
     {"post_id":Your post id, "parent_id":The original comment id, "content": the content of the commen}
 
