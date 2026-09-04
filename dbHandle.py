@@ -109,7 +109,7 @@ def update_webhook(connection,id,webhook):
           connection.commit()
      except Exception as err:
           connection.rollback()
-          raise WebhookCantBeUpdated(err)
+          raise AuthorCantBeUpdate(err)
 
 
 
@@ -134,5 +134,5 @@ class ValidationError(Exception):
 class AuthorCantBeRegisteredError(Exception):
      pass
 
-class WebhookCantBeUpdated(Exception):
+class AuthorCantBeUpdate(Exception):
      pass
