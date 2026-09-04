@@ -1,8 +1,7 @@
 from pathlib import Path
 import dbHandle
-import sqlite3
+import sqlite3,requests,logging
 from flask import Flask,render_template,request,jsonify,g
-import requests
 from queue import Queue,Full
 from threading import Thread
 from auth import authenticate
@@ -17,8 +16,13 @@ app = Flask(__name__)
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["1000 per day", "200 per hour"]
+    default_limits=["3500 per day", "200 per hour"]
 )
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(name)s: %(message)s")
+
 
 #Will look to limit the queue later
 db_tasks = Queue(maxsize=1000)
@@ -51,14 +55,14 @@ def db_worker():
                         try:
                             hook_tasks.put_nowait({"webhook":hook,"post_id": comment_data["post_id"],"parent_id": comment_id, "content": comment_data["content"]})
                         except Full:
-                            return jsonify(error="Server is busy"), 503
+                            logger.error(f"Full queue: Couldn't add comment")
         except sqlite3.OperationalError  as err:
             if "locked" in str(err) or "closed" in str(err):
                 connection.close()
                 connection = worker_connection()
-            print("DB error: ", err)
+            logger.exception(f"DB error: {g.author}")
         except Exception as err:
-            print("Code error: ", err) 
+            logger.exception(f"Code error: {g.author}")
 
         finally:
             db_tasks.task_done()
@@ -71,7 +75,7 @@ def hook_worker():
         try:
             requests.post(hook,json=task,timeout=10)
         except Exception as err:
-            pass
+            logger.exception(f"Couldn't send to {hook}")
         finally:
             hook_tasks.task_done()
         
@@ -96,13 +100,13 @@ def close_connection(error=None):
 def greeting():
     connection = get_connection()
     cursor = dbHandle.display_posts(connection)
-    #Fetch all will cause problems if there are many posts (check pagination)
+    #Fetch all will cause problems if there are many posts (check pagination) (currently this is temporary fixed by limiting posts to 100)
     return render_template("index.html",posts=cursor.fetchall())
 
 
 @app.route("/post", methods=["POST"])
-@authenticate
 @limiter.limit("5 per minute")
+@authenticate
 def post():
     author = g.author
     data = request.get_json(silent=True)
@@ -129,8 +133,8 @@ def post():
 
 
 @app.route("/comment", methods=["POST"])
-@authenticate
 @limiter.limit("15 per minute")
+@authenticate
 def comment():
     data = request.get_json(silent=True)
     author = g.author
@@ -156,7 +160,7 @@ def comment():
 
     comment_data = {"author_id":author,"content":data["content"],"post_id":data["post_id"],"parent_id":data.get("parent_id",None)}
     
-    print("Comment on post: ", comment_data["post_id"])
+    logger.info(f"Comment on post: {comment_data['post_id']}")
 
     try:
         db_tasks.put_nowait({"type":"comment","data":comment_data})
@@ -187,8 +191,8 @@ def read(post_id):
     
 
 @app.route("/randomPost")
-@authenticate
 @limiter.limit("60 per minute")
+@authenticate
 def randomPost():
     connection = get_connection() 
     author = g.author
