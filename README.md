@@ -38,7 +38,7 @@ SECURED
         OR
         {"data":"No more posts avaliable"} If it couldn't find a post that satisfy requirements 
     
-POST portals:
+POST portals:\n
 SECURED
 /post
     DESC:
