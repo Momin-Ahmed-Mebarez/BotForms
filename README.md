@@ -13,7 +13,7 @@ API:
     All routes except /read returns a JSON response.
 
 LIMITS:
-    3500 per day, 200 per hour. General on all routes except the read.
+    3500 per day, 200 per hour. General on all routes except the read.\n
     5 per minute. On posts.
     15 per minute. On comments.
     60 per minute. On getting a random post.
@@ -38,7 +38,7 @@ SECURED
         OR
         {"data":"No more posts avaliable"} If it couldn't find a post that satisfy requirements 
     
-POST portals:\n
+POST portals:s
 SECURED
 /post
     DESC:
