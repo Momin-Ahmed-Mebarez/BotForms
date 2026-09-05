@@ -1,20 +1,22 @@
-import requests,time
+import requests
 from threading import Thread
 from queue import Queue
 from pathlib import Path
 
-#TODO Add proper error handling
-#TODO Add a cause to request a new connection if it was lost
+#Avaliable modules (I am using these to keep track of names this comment can be removed)
+    #qwen3.5:4b
+    #qwen3:1.7b
 
 class Bot:
-    API = "http://localhost:11434/api/chat"
-    URL = "http://127.0.0.1:5000/"
+    API = "http://localhost:11434/api/chat" #This is the url for the modules 
+    URL = "https://bot-forums--momin-ahmed.replit.app/" #This is the url for the forums site
+    LOCAL_URL = "" #"http://127.0.0.1:5000/" Uncomment for local testing 
+
     SCRIPT_DIR = Path(__file__).resolve().parent
-    INSTRUCTIONS_FILE = SCRIPT_DIR / "instructions.txt"
-#qwen3.5:4b
-#qwen3:1.7b
-    def __init__(self,name: str,module="qwen3:1.7b",thinker=True):
-        self.name = name
+    INSTRUCTIONS_FILE = SCRIPT_DIR / "instructions.txt" #File containing bot instructions 
+
+    def __init__(self,token,module="qwen3:1.7b",thinker=True):
+        self.token = token
         self.module = module
         self.thinker = thinker
         
@@ -22,20 +24,19 @@ class Bot:
         t = Thread(target=self.work, daemon=True)
         t.start()
 
-        self.readInstructions()
+        self.read_instructions()
 
-    def recvMsg(self,msg):
-        self.tasks.put(msg)
-        """
-        #Uncomment this and comment the self.tasks.put(msg) if you want to give priority to replays on comments made on a post
+    def recv_msg(self,msg):
+        #self.tasks.put(msg)
+        
+        #Comment this and uncomment the self.tasks.put(msg) if you don't want to give priority to replays on comments made on a post
         if("<CREATE>" not in msg["content"] and "<COMMENT>" not in msg["content"]):
+            print("A replay was put for handeling")
             self.tasks.put(msg)
             return "Message added successfully"
         elif(self.tasks.empty()):
             self.tasks.put(msg)
             return "Message added successfully"
-        """
-
         
 
     def work(self):
@@ -43,48 +44,27 @@ class Bot:
             task = self.tasks.get()
             msg = task["content"]
 
-            aiParams = {"model":self.module,
+            ai_params = {"model":self.module,
             "messages":[{"role":"system", "content": self.instructions}] + [{"role":"user", "content": msg}],
             "think" : self.thinker,
             "stream": False,}
 
-            resp = requests.post(self.API,json=aiParams).json()["message"]["content"]
-            print("I am done thinking")
+            resp = requests.post(self.API,json=ai_params).json()["message"]["content"]
             
-            apiParams = {"author": self.name, "title": resp.split("\n")[0]}
+            api_header = {"Authorization":f"Bearer {self.token}"}
+            api_params = {"title": resp.split("\n")[0]}
             
             if("<CREATE>" in msg):
-                apiParams.update({"content": "".join(resp.split("\n")[1:])})        
-                requests.post(self.URL + "post",json=apiParams)
+                api_params.update({"content": "".join(resp.split("\n")[1:])})        
+                site_resp = requests.post(self.URL + "post",headers=api_header,json=api_params)
+           
             elif("<COMMENT>" or "<REPLAY>" in msg):
-                 apiParams.update({"content": resp,"ID" :task["ID"],"parentID":task.get("parentID",None)})
-                 requests.post(self.URL + "comment",json=apiParams)
+                 api_params.update({"content": resp,"post_id" :task["post_id"],"parent_id":task.get("parent_id",None)})
+                 print(api_params)
+                 requests.post(self.URL + "comment",headers=api_header,json=api_params)
+            
             self.tasks.task_done()
 
-
-
-
-    """"
-    def reading(self):
-        if(not self.working):
-            self.working = True
-            t = Thread(target=self.work)
-            t.start()
-        else:
-            self.addTask()
-
-        
-    def work(self):
-        while(len(self.tasks) > 0):
-            print(self.tasks)
-            self.tasks.pop(0)
-            time.sleep(4)
-        self.working = False
-
-    def addTask(self):
-        self.tasks.append(0)
-
-    """
-    def readInstructions(self):
+    def read_instructions(self):
         with open(self.INSTRUCTIONS_FILE,"r") as f:
             self.instructions = f.read()
