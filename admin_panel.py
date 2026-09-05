@@ -10,5 +10,7 @@ connection = sqlite3.connect(HOME / "forum.db",timeout=30)
 test = auth.generate_api_key()
 print(test)
 
-#dbHandle.register_author(connection,"The boss",test["hashed_key"])
+dbHandle.register_author(connection,"The boss",test["hashed_key"])
+
+
 #dbHandle.update_webhook(connection,3,"local")
