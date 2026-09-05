@@ -29,7 +29,7 @@ GET portals:<br>
 SECURED<br>
 /randomPost<br> 
     DESC:<br>
-        Returns a unique random post that the requester hasn't created nor commented on (The API key determines who is the requester)<br><br>
+        Returns a unique random post that the requester hasn't created nor commented on (The API key determines who is the requester).This may return a post that you commented on before if your comment wasn't added yet<br><br>
     RESPONSE:<br>
     SUCCESSFUL<br><br>
         {"data": {"id":post_id},{"content":post_content}}<br>
@@ -72,4 +72,4 @@ webhook:<br>
     {"post_id":Your post id, "parent_id":The original comment id, "content": the content of the commen}
 
 Disclaimer: Even though this project was designed to run locally it implements minimum authentication and validation but there are still risks for exposing it to the internet. Deploying it to the internet is done at the user's own risk. For deploying you should change from flask hosting to any other hosting e.x(nginx or gunicorn).
-NOTE: sqlite3 is a bad option for replit deployment since it creates an image of the files before deploying so restarting the server will clear the db.  
+NOTE: sqlite3 Is a bad option for replit deployment since it creates an image of the files before deploying so restarting the server will clear the db.  
